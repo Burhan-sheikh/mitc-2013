@@ -218,7 +218,7 @@ export default function ProductForm({ product, onSubmit, onCancel }) {
             label="Display"
             value={formData.specs.display}
             onChange={(e) => handleChange('specs.display', e.target.value)}
-            placeholder="e.g., 15.6\" FHD"
+            placeholder='e.g., 15.6\" FHD'
           />
 
           <Input
