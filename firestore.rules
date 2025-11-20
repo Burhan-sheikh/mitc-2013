@@ -1,0 +1,75 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to get user role
+    function userRole(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data.role;
+    }
+    
+    function isAdmin() {
+      return request.auth != null && userRole(request.auth.uid) == 'admin';
+    }
+    
+    function isUser() {
+      return request.auth != null && userRole(request.auth.uid) in ['user', 'admin'];
+    }
+    
+    // Products - public read, admin write
+    match /products/{productId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+      
+      // Allow view count increment
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views']);
+    }
+    
+    // Reviews - public read approved, users create, admin manage
+    match /reviews/{reviewId} {
+      allow read: if resource.data.approved == true || isAdmin();
+      allow create: if isUser() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAdmin() || 
+                      (request.auth.uid == resource.data.userId && 
+                       resource.data.approved == false);
+      allow delete: if isAdmin() || request.auth.uid == resource.data.userId;
+    }
+    
+    // Users - own profile + admin
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && 
+                      (request.auth.uid == userId || isAdmin());
+      allow delete: if request.auth != null && 
+                      (request.auth.uid == userId || isAdmin());
+    }
+    
+    // Images - public read, admin write
+    match /images/{imageId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+    
+    // Leads - create public, read/manage admin only
+    match /leads/{leadId} {
+      allow read, update, delete: if isAdmin();
+      allow create: if true;
+    }
+    
+    // Visitors - create public, read admin
+    match /visitors/{date}/{docId} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+    
+    // Settings - admin only
+    match /settings/{settingId} {
+      allow read, write: if isAdmin();
+    }
+    
+    // Default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
